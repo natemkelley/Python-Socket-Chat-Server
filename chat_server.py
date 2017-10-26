@@ -39,7 +39,7 @@ def helpRequest (sock):
 
 def testRequest (sock, data):
     print ("Test request sent")
-    sock.send(data[6:]+ "\r\n")
+    sock.send(data[6:])
 
 def nameRequest (sock, data):
     print ("Name request sent")
@@ -57,7 +57,7 @@ def pushRequest (sock, data):
         datName = SOCK_NAME[id(sock)]
     else:
         datName = "unknown"
-    CHAT_BUFFER.append("[%s] %s" % (datName, data.replace('\r\n', '')[6:]))       
+    CHAT_BUFFER.append("%s: %s" % (datName, data.replace('\r\n', '')[6:]))       
     sock.send("OK\r\n")
 
 def getrangeRequest (sock, data):
@@ -72,7 +72,7 @@ def getrangeRequest (sock, data):
 def unknownRequest (sock, data):
     print ("Unkown request sent")
     sock.send("Error: unrecognized command: %s" % data)
-    print ("Unkown request sent")
+    print ("Unkown request sent" + "\r\n")
 
 
 def adiosRequest (sock):
