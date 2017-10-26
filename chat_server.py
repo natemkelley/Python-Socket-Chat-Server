@@ -5,6 +5,7 @@
 #https://stackoverflow.com/questions/39535855/send-receive-data-over-a-socket-python3
 #https://www.tutorialspoint.com/python/string_replace.htm
 #ruby rubyTestScript.rb 127.0.0.1 random
+#midwayguy
 
 import sys
 import socket
@@ -17,7 +18,72 @@ SOCKET_LIST = []         #socket list array
 RECV_BUFFER = 4096 
 PORT = 9020
 SOCK_NAME = {}
+CHAT_BUFFER = []
 
+
+def initialConnection (sock):
+            sock.send("Welcome to Nate's chat server\r\n")
+            print "initialConnection function finished"
+ 
+def helpRequest (sock):
+    print ("Help request sent")
+    sock.send(("Chat Server Help:"
+        "\nhelp:"
+        "\ntest:"
+        "\nname:"
+        "\nget:"
+        "\npush:"
+        "\ngetrange:"
+        "\nSOME UNRECOGNIZED COMMAND"
+        "\nadios: Checks for EOF or CLOSE SOCKET\r\n"))
+
+def testRequest (sock, data):
+    print ("Test request sent")
+    sock.send(data[6:]+ "\r\n")
+
+def nameRequest (sock, data):
+    print ("Name request sent")
+    SOCK_NAME[id(sock)] = data.replace('\r\n', '')[6:] #6: discounts first six chars
+    print "new connection name = " + SOCK_NAME[id(sock)]
+    sock.send("OK\r\n")
+
+def getRequest (sock):
+    print ("Get request sent")
+    sock.send("\n".join(CHAT_BUFFER) + "\r\n")
+
+def pushRequest (sock, data):
+    print ("Push request sent")
+    if id(sock) in SOCK_NAME:
+        datName = SOCK_NAME[id(sock)]
+    else:
+        datName = "unknown"
+    CHAT_BUFFER.append("[%s] %s" % (datName, data.replace('\r\n', '')[6:]))       
+    sock.send("OK\r\n")
+
+def getrangeRequest (sock, data):
+    print ("GetRange request sent")
+    data = data.strip().decode('utf-8')
+    split_data = data.split()
+    first_int = int(split_data[1])
+    second_int = int(split_data[2])+1    
+    sock.send("\n".join(CHAT_BUFFER[first_int: second_int]) + "\r\n" )
+
+
+def unknownRequest (sock, data):
+    print ("Unkown request sent")
+    sock.send("Error: unrecognized command: %s" % data)
+    print ("Unkown request sent")
+
+
+def adiosRequest (sock):
+    print ("Adios request sent")
+    #sock.send("Adios. You will be missed\n\n")
+    if id(sock) in SOCK_NAME:
+        print "socket deleted"
+        del SOCK_NAME[id(sock)]
+    if sock in SOCKET_LIST:
+        SOCKET_LIST.remove(sock)
+    sock.close()   
 
 def server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,126 +102,71 @@ def server():
         ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
       
         for sock in ready_to_read:
+            print "for loop entered"
             # a new connection request recieved
             if sock == server_socket:
                 sockfd, addr = server_socket.accept()
                 SOCKET_LIST.append(sockfd)
                 print ("Client (%s, %s) connected" % addr)
                 initialConnection(sockfd)
+                #sockfd.send("Welcome to Nate's chat server")
+                print "welcome sent"
+
             # a message from a client, not a new connection
             else:
                 # process data recieved from client, 
                 try:
                     # receiving data from the socket.
                     data = sock.recv(RECV_BUFFER)
-                    data = data.strip().decode('utf-8')
-                    split_data = data.split()
+                    data2 = data.strip().decode('utf-8')
+                    split_data = data2.split()
                     first_word = split_data[0]
+                    print "if statement entered"
+
                     
                     if data:
-                        broadcast(server_socket, sock, "\r" + '[' + str(sock.getpeername()) + '] ' + data)
-                        print ("this is the stripped data=="+data)
-                        print ("this is the split data=="+first_word)
+                        #print ("this is the stripped data=="+data)
+                        #print ("this is the split data=="+first_word)
+                        print data
 
-                        if data == "help":
+                        if re.match("^help\r\n$", data):
                             helpRequest(sock)
-                        elif data == "adios":
+                        elif re.match("^adios\r\n$", data):
                             adiosRequest(sock)
-                        elif first_word =="name:":
+                        elif re.match("^name:\s[^\r\n]+\r\n$", data):
                             nameRequest(sock, data)
-                        elif first_word =="test:":
+                        elif re.match("^test:\s[^\r\n]+\r\n$", data):
                             testRequest(sock, data)
-                        elif data=="get: ":
+                        elif re.match("^get\r\n$", data):
                             getRequest(sock)
-                        elif data=="push: ":
-                            pushRequest(sock)
-                        elif data=="getrange":
-                            getrangeRequest(sock)
+                        elif re.match("^push:\s[^\r\n]+\r\n$", data):
+                            pushRequest(sock, data)
+                        elif re.match("^getrange(\s\d+){2}\r\n$", data):
+                            getrangeRequest(sock,data)
                         else:
-                            unknownRequest(sock)
-
+                            unknownRequest(sock,data)
 
                     else:
+                        print "else statement entered"
                         # remove the socket that's broken    
                         if sock in SOCKET_LIST:
                             SOCKET_LIST.remove(sock)
                         # at this stage, no data means probably the connection has been broken
-                        broadcast(server_socket, sock, "Client (%s, %s) is offline\n" % addr) 
                 # exception 
-                except:
+                except Exception, err:
+                    print "except"
                     print (traceback.format_exc())
                     print ("Unexpected error:", sys.exc_info()[0])
                     continue
 
     server_socket.close()
 
-    # broadcast chat messages to all connected clients
-def broadcast (server_socket, sock, message):
-    for socket in SOCKET_LIST:
-        # send the message only to peer
-        if socket != server_socket and socket != sock :
-            try :
-                socket.send(message)
-            except :
-                # broken socket connection
-                print ("closing broken socket :(")
-                socket.close()
-                # broken socket, remove it
-                if socket in SOCKET_LIST:
-                    print ("removed from socket list")
-                    SOCKET_LIST.remove(socket)
+if __name__ == "__main__":
+    print ("__name__")
+    sys.exit(server())  
+
+
 
                                     
-def initialConnection (sock):
-    sock.send("Welcome to Nate's chat server")
- 
-def helpRequest (sock):
-    print ("Help request sent")
-    sock.send(("Chat Server Help: "
-        "\nhelp:  <cr><lf> receives a response of a list of the commands and their syntax"
-        "\ntest:  words<cr><lf> receives a response of 'words<cr><lf>'"
-        "\nname:  <chatname><cr><lf> receives a response of 'OK<cr><lf>'"
-        "\nget:   <cr><lf> receives a response of the entire contents of the chat buffer"
-        "\npush:  <stuff><cr><lf> receives a response of 'OK<cr><lf>'' \n\tThe result is that '<chatname>: <stuff>'' is added as a new line to the chat buffer"
-        "\ngetrange: <startline> <endline><cr><lf> receives a response of lines <startline> through <endline>\n\t from the chat buffer. getrange assumes a 0-based buffer. Your client should return lines <startline> <endline>"
-        "\nSOME UNRECOGNIZED COMMAND<cr><lf> receives a response 'Error: unrecognized command: SOME UNRECOGNIZED COMMAND<cr><lf>'"
-        "\nadios: <cr><lf> will quit the current connection. Checks for EOF or CLOSE SOCKET\r\n"))
 
-def testRequest (sock, data):
-    print ("Test request sent")
-    sock.send(data[6:])
-
-def nameRequest (sock, data):
-    print ("Name request sent")
-    SOCK_NAME[id(sock)] = data.replace('\r\n', '')[6:] #6: discounts first six chars
-    print "new connection name = " + SOCK_NAME[id(sock)]
-    sock.send("Ok")
-
-def getRequest (sock):
-    print ("Get request sent")
-    sock.send("get")
-
-def pushRequest (sock):
-    print ("Push request sent")
-    sock.send("push")            
-
-def getrangeRequest (sock):
-    print ("GetRange request sent")
-    sock.send("Get Range")
-
-def unknownRequest (sock):
-    print ("Unkown request sent")
-    sock.send("Unknown")
-
-def adiosRequest (sock):
-    print ("Adios request sent")
-    sock.send("Adios. You will be missed\n\n")
-    if id(sock) in SOCK_NAME:
-        del SOCK_NAME[id(sock)]
-    if sock in SOCKET_LIST:
-        SOCKET_LIST.remove(sock)
-    sock.close()
-    
-if __name__ == "__main__":
-    #print ("__name__")
-    sys.exit(server())          
+            

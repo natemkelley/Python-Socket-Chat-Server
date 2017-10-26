@@ -139,7 +139,7 @@ elsif ARGV[1] == "evil"
   s.getline
 
   s.send_raw("hel")
-  #sleep(5)
+  sleep(5)
   s.send_with_rn("p")
   s.getline
 

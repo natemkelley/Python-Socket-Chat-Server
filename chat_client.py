@@ -39,7 +39,8 @@ def chat_client():
                 else :
                     #print data
                     sys.stdout.write(data)
-                    sys.stdout.write('\n[ME] '); sys.stdout.flush()     
+                    sys.stdout.write('\n') 
+                    sys.stdout.flush()     
             
             else :
                 # user entered a message
