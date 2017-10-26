@@ -5,7 +5,7 @@
 #https://stackoverflow.com/questions/39535855/send-receive-data-over-a-socket-python3
 #https://www.tutorialspoint.com/python/string_replace.htm
 #ruby rubyTestScript.rb 127.0.0.1 random
-#midwayguy
+
 
 import sys
 import socket
